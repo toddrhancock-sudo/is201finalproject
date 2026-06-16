@@ -1,0 +1,47 @@
+body {
+  background-image: url("../images/arabic.jpg");
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.header {
+  text-align: center;
+  color: black;
+  font-weight: bold;
+  font-family:'Times New Roman', Times, serif;
+  background-color: white;
+    top: 5px;
+  left: 15px;
+  right: 25px;
+  height: 100px;
+  position: fixed
+
+}
+
+.main {
+  color: navy;
+  background-color: beige;
+  font-family:'Courier New', Courier, monospace;
+    top: 115px;
+  left: 130px;
+  right: 140px;
+  bottom: 40px;
+
+}
+
+h3{
+  background-color: white;
+  font-family:'Courier New', Courier, monospace;
+}
+
+.right {
+  color: violet;
+  background-color: white;
+  font-family:Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;
+  top: 115px;
+  right: 25px;
+  width: 100px;
+  bottom: 40px;
+}
+
