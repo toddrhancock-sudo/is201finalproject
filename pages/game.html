@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Poker Table</title>
+
+<style>
+body {
+  background:#0b3d0b;
+  color:white;
+  font-family:Arial;
+  text-align:center;
+}
+
+#table {
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:center;
+}
+
+.player {
+  border:1px solid white;
+  padding:10px;
+  margin:5px;
+  width:130px;
+}
+
+.cards { font-size:18px; }
+
+button { padding:8px; margin:5px; }
+</style>
+</head>
+
+<body>
+
+<h1>♠ Texas Hold'em ♥</h1>
+
+<p>Your Money: $<span id="money">100</span></p>
+
+<label>AI Players:
+<select id="aiCount">
+<option>1</option><option>2</option><option selected>3</option>
+<option>4</option><option>5</option><option>6</option>
+<option>7</option><option>8</option><option>9</option>
+<option>10</option><option>11</option>
+</select>
+</label>
+
+<br><br>
+<button onclick="startGame()">Start Round</button>
+<button onclick="call()">Call</button>
+<button onclick="raise()">Raise</button>
+<button onclick="fold()">Fold</button>
+
+<h3>Table Cards</h3>
+<div id="tableCards" class="cards"></div>
+
+<h3>Players</h3>
+<div id="table"></div>
+
+<h3 id="status"></h3>
+
+<script>
+
+// ===== STATE =====
+let deck, player, aiPlayers=[], table=[], pot=0;
+let phase=0;
+let gameActive=false;
+
+// ===== DOM =====
+const moneyEl = document.getElementById("money");
+const aiCountEl = document.getElementById("aiCount");
+
+// ===== MONEY UPDATE =====
+function updateMoney(){
+  moneyEl.textContent = Math.max(0, Math.floor(player.money));
+}
+
+// ===== DECK =====
+function deckInit(){
+  let suits=["♠","♥","♦","♣"];
+  let vals="23456789TJQKA";
+  let d=[];
+  for(let s of suits){
+    for(let i=0;i<vals.length;i++){
+      d.push({v:vals[i],s,val:i});
+    }
+  }
+  return d;
+}
+
+function shuffle(d){
+  for(let i=d.length-1;i>0;i--){
+    let j=Math.floor(Math.random()*(i+1));
+    [d[i],d[j]]=[d[j],d[i]];
+  }
+}
+
+// ===== HAND RANK =====
+const names=["High Card","Pair","Two Pair","Three Kind","Straight","Flush","Full House","Four Kind","Straight Flush"];
+
+function rankHand(cards){
+  let vals=cards.map(c=>c.val).sort((a,b)=>a-b);
+  let suits=cards.map(c=>c.s);
+
+  let counts={};
+  vals.forEach(v=>counts[v]=(counts[v]||0)+1);
+
+  let pairs = Object.values(counts).filter(x=>x===2).length;
+  let three = Object.values(counts).includes(3);
+  let four = Object.values(counts).includes(4);
+
+  let suitCount={};
+  suits.forEach(s=>suitCount[s]=(suitCount[s]||0)+1);
+  let flush = Object.values(suitCount).some(x=>x>=5);
+
+  let unique=[...new Set(vals)];
+  let straight=false;
+  for(let i=0;i<unique.length-4;i++){
+    if(unique[i+4] === unique[i] + 4){
+      straight=true;
+      break;
+    }
+  }
+
+  if(straight && flush) return 8;
+  if(four) return 7;
+  if(three && pairs) return 6;
+  if(flush) return 5;
+  if(straight) return 4;
+  if(three) return 3;
+  if(pairs===2) return 2;
+  if(pairs===1) return 1;
+  return 0;
+}
+
+// ===== GAME START =====
+function startGame(){
+  deck=deckInit();
+  shuffle(deck);
+
+  player={
+    money:parseInt(moneyEl.textContent),
+    hand:[],
+    folded:false
+  };
+
+  aiPlayers=[];
+  let count=parseInt(aiCountEl.value);
+
+  for(let i=0;i<count;i++){
+    aiPlayers.push({
+      name:"AI "+(i+1),
+      hand:[],
+      folded:false,
+      money:100
+    });
+  }
+
+  table=[];
+  pot=0;
+  phase=0;
+  gameActive=true;
+
+  for(let i=0;i<2;i++){
+    player.hand.push(deck.pop());
+    aiPlayers.forEach(ai=>ai.hand.push(deck.pop()));
+  }
+
+  updateMoney();
+  render();
+  setStatus("New round started!");
+}
+
+// ===== ACTIONS =====
+function call(){
+  if(!gameActive || player.folded || player.money <= 0) return;
+
+  let bet = Math.min(10, player.money);
+  player.money -= bet;
+  pot += bet;
+
+  updateMoney();
+  aiTurn();
+  nextPhase();
+}
+
+function raise(){
+  if(!gameActive || player.folded || player.money <= 0) return;
+
+  let bet = Math.min(20, player.money);
+  player.money -= bet;
+  pot += bet;
+
+  updateMoney();
+  aiTurn(true);
+  nextPhase();
+}
+
+function fold(){
+  if(!gameActive || player.folded) return;
+
+  player.folded=true;
+  setStatus("You folded.");
+}
+
+// ===== AI =====
+function aiTurn(agg=false){
+  aiPlayers.forEach(ai=>{
+    if(ai.folded || ai.money<=0) return;
+
+    let strength = rankHand(ai.hand.concat(table));
+
+    let bet = (strength>2 || agg) ? 20 : 10;
+    bet = Math.min(bet, ai.money);
+
+    if(strength < 1 && Math.random()<0.3){
+      ai.folded=true;
+    } else {
+      ai.money -= bet;
+      pot += bet;
+    }
+  });
+}
+
+// ===== PHASE =====
+function nextPhase(){
+  if(phase===0){
+    table.push(deck.pop(),deck.pop(),deck.pop());
+    setStatus("Flop");
+  }
+  else if(phase===1){
+    table.push(deck.pop());
+    setStatus("Turn");
+  }
+  else if(phase===2){
+    table.push(deck.pop());
+    setStatus("River");
+  }
+  else {
+    showdown();
+    return;
+  }
+
+  phase++;
+  render();
+}
+
+// ===== SHOWDOWN =====
+function showdown(){
+  gameActive=false;
+
+  if(player.folded){
+    setStatus("You folded.");
+    render(true);
+    return;
+  }
+
+  let best=rankHand(player.hand.concat(table));
+  let winner="You";
+
+  aiPlayers.forEach(ai=>{
+    if(ai.folded) return;
+
+    let score=rankHand(ai.hand.concat(table));
+    if(score>best){
+      best=score;
+      winner=ai.name;
+    }
+  });
+
+  if(winner==="You"){
+    player.money += pot;
+  }
+
+  updateMoney();
+  render(true);
+  setStatus(winner + " wins $" + pot);
+}
+
+// ===== RENDER =====
+function render(showAll=false){
+  document.getElementById("tableCards").textContent =
+    table.map(c=>c.v+c.s).join(" ");
+
+  let div=document.getElementById("table");
+  div.innerHTML="";
+
+  div.innerHTML += `
+  <div class="player">
+    🧑 YOU<br>
+    ${player.hand.map(c=>c.v+c.s).join(" ")}<br>
+    ${showAll ? names[rankHand(player.hand.concat(table))] : ""}
+  </div>
+  `;
+
+  aiPlayers.forEach(ai=>{
+    div.innerHTML += `
+    <div class="player">
+      🤖 ${ai.name}<br>
+      ${showAll ? ai.hand.map(c=>c.v+c.s).join(" ") : "🂠 🂠"}<br>
+      ${ai.folded ? "(Folded)" : ""}
+    </div>
+    `;
+  });
+}
+
+// ===== STATUS =====
+function setStatus(msg){
+  document.getElementById("status").textContent =
+    msg + " | Pot $" + pot;
+}
+
+</script>
+
+</body>
+</html>
